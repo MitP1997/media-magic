@@ -1,4 +1,6 @@
-import tkinter as tk
+from ttkbootstrap import Style
+from ttkbootstrap.constants import *
+import ttkbootstrap as ttkb
 from tkinter import ttk, filedialog, messagebox
 from .audio_utils import is_audio_file, get_audio_duration, create_if_not_exists
 from .logger import logger
@@ -21,13 +23,13 @@ class MediaMagicGUI:
         self.root.geometry('500x300')
         self.root.minsize(500, 300)
         # Add a top label for visibility
-        top_label = ttk.Label(self.root, text='Welcome to Media Magic!', font=('Arial', 14, 'bold'))
+        top_label = ttkb.Label(self.root, text='Media Magic!', font=('Arial', 14, 'bold'), bootstyle="primary")
         top_label.pack(pady=5)
 
     def _setup_tabs(self):
-        self.tab_control = ttk.Notebook(self.root)
-        self.video_tab = ttk.Frame(self.tab_control)
-        self.audio_tab = ttk.Frame(self.tab_control)
+        self.tab_control = ttkb.Notebook(self.root)
+        self.video_tab = ttkb.Frame(self.tab_control)
+        self.audio_tab = ttkb.Frame(self.tab_control)
         self.tab_control.add(self.video_tab, text='Video Magic')
         self.tab_control.add(self.audio_tab, text='Audio Magic')
         self.tab_control.pack(expand=1, fill='both')
@@ -35,61 +37,61 @@ class MediaMagicGUI:
 
     def _setup_audio_tab(self):
         # Audio Magic Tab
-        self.audio_file_path = tk.StringVar()
+        self.audio_file_path = ttkb.StringVar()
         self.audio_file_path.trace_add('write', self.on_audio_file_selected)
 
-        self.select_btn = ttk.Button(self.audio_tab, text='Select Audio File', command=self.select_audio_file)
+        self.select_btn = ttkb.Button(self.audio_tab, text='Select Audio File', command=self.select_audio_file, bootstyle="success-outline,rounded")
         self.select_btn.pack(pady=10)
-        self.file_label = ttk.Label(self.audio_tab, textvariable=self.audio_file_path)
+        self.file_label = ttkb.Label(self.audio_tab, textvariable=self.audio_file_path, bootstyle="info")
         self.file_label.pack(pady=5)
 
         # Progress label
-        self.progress_var = tk.StringVar(value='')
-        self.progress_label = ttk.Label(self.audio_tab, textvariable=self.progress_var, foreground='blue')
+        self.progress_var = ttkb.StringVar(value='')
+        self.progress_label = ttkb.Label(self.audio_tab, textvariable=self.progress_var, bootstyle="warning")
         self.progress_label.pack(pady=5)
 
         # Start/End time widgets
-        self.start_time_vars = [tk.IntVar(value=0) for _ in range(3)]  # hours, min, sec
-        self.end_time_vars = [tk.IntVar(value=0) for _ in range(3)]    # hours, min, sec
+        self.start_time_vars = [ttkb.IntVar(value=0) for _ in range(3)]  # hours, min, sec
+        self.end_time_vars = [ttkb.IntVar(value=0) for _ in range(3)]    # hours, min, sec
 
-        time_frame = ttk.Frame(self.audio_tab)
+        time_frame = ttkb.Frame(self.audio_tab)
         time_frame.pack(pady=5)
 
         # Start time
-        ttk.Label(time_frame, text='Start Time:').grid(row=0, column=0, padx=2)
-        self.start_hour_entry = ttk.Entry(time_frame, width=3, textvariable=self.start_time_vars[0], state='disabled')
+        ttkb.Label(time_frame, text='Start Time:').grid(row=0, column=0, padx=2)
+        self.start_hour_entry = ttkb.Entry(time_frame, width=3, textvariable=self.start_time_vars[0], state='disabled')
         self.start_hour_entry.grid(row=0, column=1)
-        ttk.Label(time_frame, text='hr').grid(row=0, column=2)
-        self.start_min_entry = ttk.Entry(time_frame, width=3, textvariable=self.start_time_vars[1], state='disabled')
+        ttkb.Label(time_frame, text='hr').grid(row=0, column=2)
+        self.start_min_entry = ttkb.Entry(time_frame, width=3, textvariable=self.start_time_vars[1], state='disabled')
         self.start_min_entry.grid(row=0, column=3)
-        ttk.Label(time_frame, text='min').grid(row=0, column=4)
-        self.start_sec_entry = ttk.Entry(time_frame, width=3, textvariable=self.start_time_vars[2], state='disabled')
+        ttkb.Label(time_frame, text='min').grid(row=0, column=4)
+        self.start_sec_entry = ttkb.Entry(time_frame, width=3, textvariable=self.start_time_vars[2], state='disabled')
         self.start_sec_entry.grid(row=0, column=5)
-        ttk.Label(time_frame, text='sec').grid(row=0, column=6)
+        ttkb.Label(time_frame, text='sec').grid(row=0, column=6)
 
         # End time
-        ttk.Label(time_frame, text='End Time:').grid(row=1, column=0, padx=2)
-        self.end_hour_entry = ttk.Entry(time_frame, width=3, textvariable=self.end_time_vars[0], state='disabled')
+        ttkb.Label(time_frame, text='End Time:').grid(row=1, column=0, padx=2)
+        self.end_hour_entry = ttkb.Entry(time_frame, width=3, textvariable=self.end_time_vars[0], state='disabled')
         self.end_hour_entry.grid(row=1, column=1)
-        ttk.Label(time_frame, text='hr').grid(row=1, column=2)
-        self.end_min_entry = ttk.Entry(time_frame, width=3, textvariable=self.end_time_vars[1], state='disabled')
+        ttkb.Label(time_frame, text='hr').grid(row=1, column=2)
+        self.end_min_entry = ttkb.Entry(time_frame, width=3, textvariable=self.end_time_vars[1], state='disabled')
         self.end_min_entry.grid(row=1, column=3)
-        ttk.Label(time_frame, text='min').grid(row=1, column=4)
-        self.end_sec_entry = ttk.Entry(time_frame, width=3, textvariable=self.end_time_vars[2], state='disabled')
+        ttkb.Label(time_frame, text='min').grid(row=1, column=4)
+        self.end_sec_entry = ttkb.Entry(time_frame, width=3, textvariable=self.end_time_vars[2], state='disabled')
         self.end_sec_entry.grid(row=1, column=5)
-        ttk.Label(time_frame, text='sec').grid(row=1, column=6)
+        ttkb.Label(time_frame, text='sec').grid(row=1, column=6)
 
-        self.transcribe_btn = ttk.Button(self.audio_tab, text='Transcribe', command=self.transcribe_audio, state=tk.DISABLED)
+        self.transcribe_btn = ttkb.Button(self.audio_tab, text='Transcribe', command=self.transcribe_audio, state="disabled", bootstyle="primary")
         self.transcribe_btn.pack(pady=10)
 
     def _setup_video_tab(self):
         # Video Magic Tab (placeholder)
-        self.video_label = ttk.Label(self.video_tab, text='Video Magic features coming soon!')
+        self.video_label = ttkb.Label(self.video_tab, text='Video Magic features coming soon!', bootstyle="secondary")
         self.video_label.pack(pady=20)
 
     def on_audio_file_selected(self, *args):
         if self.audio_file_path.get():
-            self.transcribe_btn.config(state=tk.NORMAL)
+            self.transcribe_btn.config(state=ttkb.NORMAL)
             # Enable start/end time fields
             self.start_hour_entry.config(state='normal')
             self.start_min_entry.config(state='normal')
@@ -112,7 +114,7 @@ class MediaMagicGUI:
             self.end_time_vars[1].set(mins)
             self.end_time_vars[2].set(secs)
         else:
-            self.transcribe_btn.config(state=tk.DISABLED)
+            self.transcribe_btn.config(state=ttkb.DISABLED)
             # Disable start/end time fields
             self.start_hour_entry.config(state='disabled')
             self.start_min_entry.config(state='disabled')
@@ -186,7 +188,8 @@ class MediaMagicGUI:
 
 def launch_gui():
     try:
-        root = tk.Tk()
+        style = Style(theme="pulse")
+        root = style.master
         app = MediaMagicGUI(root)
         # Bring window to foreground and focus
         root.lift()

@@ -1,2 +1,5 @@
-*.txt
-target/*
+source/*
+transcripts/*
+temp/*
+audios/*
+.DS_Store

@@ -1,4 +1,5 @@
 import os
+import time
 import argparse
 import logging
 import requests
@@ -60,6 +61,7 @@ def __transcribe_audio_by_sarvam(file_path):
       "https://api.sarvam.ai/speech-to-text",
       headers=headers,
       files=files,
+      data={"language_code": "gu-IN"}
     )
     response.raise_for_status()
     return response.json()
@@ -98,6 +100,14 @@ def transcribe(audio_files):
         transcript.append(result['transcript'])
       else:
         logger.error(f"[{chunk_path}] Transcribe Error: {result}")
+        logger.info("sleeping for 5 seconds") # generally is 429 errors.
+        time.sleep(5)
+        result = __transcribe_audio_by_sarvam(chunk_path)
+        if result and 'transcript' in result:
+          logger.info("transcribe success on retry")
+          transcript.append(result['transcript'])
+        else:
+          logger.error(f"[{chunk_path}] Transcribe Error: {result}")
 
     # Merge all data into a txt file
     transcript_path = os.path.join('transcripts', f"{base_name}.txt")
@@ -169,7 +179,7 @@ if __name__ == '__main__':
     if not args.audio_dir:
       logger.error("Missing --audio-dir parameter")
       exit(1)
-    audio_files = [os.path.join(args.audio_dir, f) for f in os.listdir(args.audio_dir) if f.endswith('.mp3')]
+    audio_files = [os.path.join(args.audio_dir, f) for f in os.listdir(args.audio_dir) if f.endswith('.mp3') or f.endswith('.m4a')]
     if not audio_files:
       logger.error(f"No audio files found in {args.audio_dir}")
       exit(1)

@@ -9,6 +9,7 @@ import asyncio
 from urllib.parse import urlparse
 import json
 from moviepy import editor
+import datetime
 
 # class SarvamTranscriber:
 #     """
@@ -213,24 +214,38 @@ class SarvamBatchTranscriber:
             logger.error(f"Download failed for {file_name}: {str(e)}")
             return False
 
-    def split_audio(self, audio_path, chunk_duration_ms):
-        logger.info(f"Called split_audio with audio_path: {audio_path}, chunk_duration_ms: {chunk_duration_ms}")
+    def split_audio(self, audio_path, chunk_duration_ms, output_dir):
+        logger.info(f"Called split_audio with audio_path: {audio_path}, chunk_duration_ms: {chunk_duration_ms}, output_dir: {output_dir}")
         chunk_duration = chunk_duration_ms / 1000  # convert ms to seconds
         audio = editor.AudioFileClip(audio_path)
         duration = int(audio.duration)
         logger.info(f"Audio duration: {duration} seconds")
-        chunks = []
+        base = os.path.splitext(os.path.basename(audio_path))[0]
+        chunk_paths = []
+        idx = 0
         for i in range(0, duration, int(chunk_duration)):
             start = i
             end = min(i + int(chunk_duration), duration)
             logger.info(f"Creating chunk from {start} to {end}")
             chunk = audio.subclip(start, end)
-            chunks.append(chunk)
+            logger.debug(f"Created chunk: type={type(chunk)}, duration={chunk.duration}, has_reader={hasattr(chunk, 'reader') and chunk.reader is not None}")
+            chunk_path = os.path.join(output_dir, f"{base}_chunk_{idx+1}.wav")
+            logger.info(f"Exporting chunk {idx+1} to {chunk_path}")
+            logger.debug(f"About to write chunk: idx={idx+1}, type={type(chunk)}, duration={chunk.duration}, has_reader={hasattr(chunk, 'reader') and chunk.reader is not None}")
+            try:
+                chunk.write_audiofile(chunk_path)
+                logger.debug(f"Successfully wrote chunk {idx+1} to {chunk_path}")
+            except Exception as e:
+                logger.error(f"Exception while writing chunk {idx+1} to {chunk_path}: {e}")
+                logger.error(f"Chunk state: type={type(chunk)}, duration={getattr(chunk, 'duration', None)}, has_reader={hasattr(chunk, 'reader') and chunk.reader is not None}")
+                raise
+            chunk_paths.append(chunk_path)
+            idx += 1
         audio.close()
-        logger.info(f"Total chunks created: {len(chunks)}")
-        return chunks
+        logger.info(f"Total chunks created and written: {len(chunk_paths)}")
+        return chunk_paths
 
-    async def transcribe_batch(self, local_files, destination_dir, chunk_duration_ms=10*60*1000, progress_callback=None):
+    async def transcribe_batch(self, local_files, destination_dir, chunk_duration_ms=60*60*1000, progress_callback=None):
         logger.info(f"Called transcribe_batch with local_files: {local_files}, destination_dir: {destination_dir}, chunk_duration_ms: {chunk_duration_ms}")
         # Step 1: Initialize the job
         job_info = await self.initialize_job()
@@ -245,30 +260,34 @@ class SarvamBatchTranscriber:
 
         # Step 2: Upload files (split if needed)
         files_to_upload = []
+        chunked_files = []  # Track chunked files for cleanup
         for file in local_files:
             logger.info(f"Processing file: {file}")
             audio = editor.AudioFileClip(file)
+            logger.debug(f"Created AudioFileClip: type={type(audio)}, duration={audio.duration}, has_reader={hasattr(audio, 'reader') and audio.reader is not None}")
             logger.info(f"Audio duration (s): {audio.duration}")
             if audio.duration * 1000 > chunk_duration_ms:
-                base = os.path.splitext(os.path.basename(file))[0]
-                chunks = self.split_audio(file, chunk_duration_ms)
-                chunk_paths = []
-                for idx, chunk in enumerate(chunks):
-                    chunk_path = os.path.join(destination_dir, f"{base}_chunk_{idx+1}.wav")
-                    logger.info(f"Exporting chunk {idx+1} to {chunk_path}")
-                    chunk.export(chunk_path, format="wav")
-                    chunk_paths.append(chunk_path)
+                chunk_paths = self.split_audio(file, chunk_duration_ms, destination_dir)
                 files_to_upload.extend(chunk_paths)
+                chunked_files.extend(chunk_paths)
             else:
                 files_to_upload.append(file)
-
             audio.close()
+            logger.debug(f"Closed AudioFileClip for file: {file}")
             logger.info(f"Finished processing file: {file}")
 
         if progress_callback:
             progress_callback("Uploading files...")
         logger.info(f"Uploading files: {files_to_upload}")
         await self.upload_files(input_storage_path, files_to_upload)
+
+        # Clean up chunked files after upload
+        for chunk_file in chunked_files:
+            try:
+                os.remove(chunk_file)
+                logger.info(f"Deleted chunked file: {chunk_file}")
+            except Exception as e:
+                logger.warning(f"Failed to delete chunked file {chunk_file}: {e}")
 
         # Step 3: Start the job
         if progress_callback:
@@ -331,6 +350,23 @@ class SarvamBatchTranscriber:
             # Post-process: convert downloaded .json transcripts to .txt with correct names
             self._convert_json_transcripts_to_txt(destination_dir, file_id_name_map)
 
+            # Remove any audio files from the destination directory
+            for f in os.listdir(destination_dir):
+                if f.lower().endswith((".wav", ".mp3", ".m4a", ".aac", ".ogg")):
+                    try:
+                        os.remove(os.path.join(destination_dir, f))
+                        logger.info(f"Deleted audio file from transcripts folder: {f}")
+                    except Exception as e:
+                        logger.warning(f"Failed to delete audio file {f}: {e}")
+
+            # Merge all .txt transcripts into a single file
+            # Get the base name of the original audio file (before chunking)
+            if local_files:
+                original_base = os.path.splitext(os.path.basename(local_files[0]))[0]
+            else:
+                original_base = "merged_transcript"
+            self._merge_transcripts(destination_dir, file_id_name_map, original_base)
+
     def _convert_json_transcripts_to_txt(self, directory, file_id_name_map=None):
         """
         For each .json file in the directory, extract the 'transcript' key and save as a .txt file named after the original audio file.
@@ -360,3 +396,44 @@ class SarvamBatchTranscriber:
                         logger.warning(f"No 'transcript' key found in {json_path}")
                 except Exception as e:
                     logger.error(f"Failed to convert {json_path} to txt: {e}")
+
+    def _merge_transcripts(self, directory, file_id_name_map=None, merged_base_name="merged_transcript"):
+        """
+        Merge all .txt transcript files in the directory into a single merged transcript file named after the original audio file.
+        The order is based on the original audio file and chunk index if possible.
+        If the merged file already exists, append new transcripts with a separator and timestamp.
+        """
+        txt_files = [f for f in os.listdir(directory) if f.endswith('.txt') and f != f'{merged_base_name}.txt']
+        # Try to order by file_id_name_map if available, else by filename
+        ordered_files = []
+        if file_id_name_map:
+            # Build a mapping from base_name to txt filename
+            base_to_txt = {os.path.splitext(v)[0]: k + '.txt' for k, v in file_id_name_map.items()}
+            for base in sorted(base_to_txt.keys()):
+                txt_file = base_to_txt[base]
+                if txt_file in txt_files:
+                    ordered_files.append(txt_file)
+            # Add any remaining txt files not in mapping
+            for f in txt_files:
+                if f not in ordered_files:
+                    ordered_files.append(f)
+        else:
+            ordered_files = sorted(txt_files)
+        merged_path = os.path.join(directory, f'{merged_base_name}.txt')
+        # Determine mode: append if file exists, else write
+        mode = 'a' if os.path.exists(merged_path) else 'w'
+        with open(merged_path, mode, encoding='utf-8') as outfile:
+            for fname in ordered_files:
+                file_path = os.path.join(directory, fname)
+                with open(file_path, 'r', encoding='utf-8') as infile:
+                    outfile.write(infile.read())
+                    outfile.write("\n")
+        logger.info(f"Merged {len(ordered_files)} transcripts into {merged_path}")
+        # Delete individual transcript files except the merged one
+        for fname in txt_files:
+            if fname != f'{merged_base_name}.txt':
+                try:
+                    os.remove(os.path.join(directory, fname))
+                    logger.info(f"Deleted individual transcript file: {fname}")
+                except Exception as e:
+                    logger.warning(f"Failed to delete transcript file {fname}: {e}")

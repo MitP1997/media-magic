@@ -29,7 +29,7 @@ jobs:
           pyinstaller --onefile --noconsole main.py  # Change to your entry script if needed
 
       - name: Upload executable as artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: media-magic-exe
           path: dist/main.exe  # Change if your entry script is different

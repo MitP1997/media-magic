@@ -16,7 +16,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.10'  # or your required version
+          python-version: '3.13.5'
 
       - name: Install dependencies
         run: |
@@ -32,4 +32,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: media-magic-exe
-          path: dist/main.exe  # Change if your entry script is different
+          path: dist/main.exe

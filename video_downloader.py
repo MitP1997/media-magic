@@ -29,17 +29,21 @@ def download_videos(file, video_dir):
 
     try:
       logger.info(f"Trying to connect to {url}")
-      yt = YouTube(url, 'TV')
+      # ANDROID returns progressive (muxed) streams; TV/WEB often do not.
+      yt = YouTube(url, client='ANDROID')
     except Exception as error:
       logger.error(f"[{url}] Connection Error: {error}")
       continue
 
     logger.info("Successfully connected")
-    streams = yt.streams
-    logger.info("Found streams")
-    stream = streams.filter(progressive=True, file_extension='mp4').order_by('resolution').desc().first()
-    logger.info("Starting download")
     try:
+      streams = yt.streams
+      logger.info("Found streams")
+      stream = streams.filter(progressive=True, file_extension='mp4').order_by('resolution').desc().first()
+      if stream is None:
+        logger.error(f"[{url}] No progressive mp4 stream available")
+        continue
+      logger.info("Starting download")
       out_file = stream.download(video_dir)
       logger.info(f"[Downloaded] {stream.title}")
       downloaded_files.append(os.path.basename(out_file))

@@ -264,7 +264,7 @@ class MediaMagicGUI:
             trimmed_audio_path = None
             try:
                 # Download video
-                yt = YouTube(link, 'TV')
+                yt = YouTube(link, client='ANDROID')
                 stream = yt.streams.filter(progressive=True, file_extension='mp4').order_by('resolution').desc().first()
                 if not stream:
                     raise Exception('No suitable video stream found.')
